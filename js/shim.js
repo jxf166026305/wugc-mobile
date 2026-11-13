@@ -121,9 +121,20 @@
       if (!root.DeepLayer) return { ok: false, error: '深度模块未加载' };
       return await root.DeepLayer.deep(code, force);
     },
-    '/api/scan/start': async function () { return notYet('全 A 股扫描'); },
-    '/api/scan/status': async function () { return { ok: true, running: false, done: 0, total: 0, rows: [], error: '手机独立版暂未开放扫描' }; },
-    '/api/scan/result': async function () { return { ok: true, rows: [] }; }
+    '/api/scan/start': async function (u) {
+      if (!root.ScanLayer) return { ok: false, error: '扫描模块未加载' };
+      var lim = Number(u.searchParams.get('limit'));
+      if (!isFinite(lim) || lim < 0) lim = 0;
+      return await root.ScanLayer.start(lim);
+    },
+    '/api/scan/status': async function () {
+      if (!root.ScanLayer) return { ok: false, error: '扫描模块未加载' };
+      return await root.ScanLayer.status();
+    },
+    '/api/scan/result': async function () {
+      if (!root.ScanLayer) return { ok: false, error: '扫描模块未加载' };
+      return await root.ScanLayer.result();
+    }
   };
 
   var originalFetch = root.fetch.bind(root);
