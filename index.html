@@ -1,0 +1,368 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>五层基本面分析 · A股深度研究</title>
+<meta name="description" content="输入 A 股代码，实时联网抓取财报与估值数据，按 L1 排雷 / L2 盈利质量 / L3 增长 / L4 估值 / L5 资金筹码 五层框架逐项分析，附图表。">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2f6fed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="五层基本面">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f6fed'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif'%3E%E4%BA%94%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <a class="brand" href="#/" id="brandLink">
+      <span class="brand-mark">五</span>
+      <span class="brand-txt"><b>五层基本面</b><small>实时联网 · 深度分析</small></span>
+    </a>
+
+    <form class="search" id="searchForm" autocomplete="off" spellcheck="false">
+      <svg class="search-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+      <input id="codeInput" type="text" inputmode="numeric" maxlength="8" placeholder="输入 6 位代码，如 002475" aria-label="股票代码">
+      <button type="submit" id="goBtn">分析</button>
+    </form>
+
+    <div class="top-actions">
+      <button class="ghost" id="refreshBtn" title="重新联网抓取（跳过缓存）"><span class="ico">↻</span><span class="lbl">刷新</span></button>
+      <button class="ghost" id="newsBtn" title="资讯雷达：新闻 / 公告 / 事件，自动标注影响板块与个股"><span class="ico">◈</span><span class="lbl">资讯雷达</span></button>
+      <button class="ghost" id="deepBtn" title="资金面 + 技术面 深度分析（可批量）"><span class="ico">◎</span><span class="lbl">资金技术</span></button>
+      <button class="ghost" id="scanBtn" title="一键评分全部主板股票（剔除 ST / 创业板 / 科创板）"><span class="ico">▤</span><span class="lbl">全A扫描</span></button>
+      <button class="ghost" id="watchBtn" title="特别关注：自选股列表 + 异动提醒"><span class="ico">★</span><span class="lbl">特别关注</span><i class="nav-badge" id="watchBadge" hidden></i></button>
+      <button class="ghost" id="limitupBtn" title="大放量涨停：封板质量、量能、连板、板块与历史次日概率"><span class="ico">⚡</span><span class="lbl">放量涨停</span></button>
+      <button class="ghost" id="indexBtn" title="全球主要指数行情"><span class="ico">◍</span><span class="lbl">全球指数</span></button>
+      <button class="ghost" id="premarketBtn" title="美股盘前：三大期指 + 热门股盘前 / 盘后延时段行情"><span class="ico">◔</span><span class="lbl">美股盘前</span></button>
+      <button class="ghost" id="printBtn" title="打印 / 存为 PDF"><span class="ico">⎙</span><span class="lbl">导出</span></button>
+      <button class="ghost" id="themeBtn" title="切换深色 / 浅色"><span class="ico">◐</span></button>
+    </div>
+  </div>
+</header>
+
+<div class="alert-strip" id="alertStrip" hidden>
+  <span class="as-ico">⚡</span>
+  <div class="as-main">
+    <b id="alertTitle">特别关注异动</b>
+    <span id="alertText"></span>
+  </div>
+  <button class="as-go" id="alertGo">查看</button>
+  <button class="as-x" id="alertClose" title="关闭">×</button>
+</div>
+
+<nav class="layer-nav" id="layerNav" hidden>
+  <div class="wrap layer-nav-in">
+    <a href="#sec-hero" data-spy="sec-hero">概览</a>
+    <a href="#sec-kline" data-spy="sec-kline">K线</a>
+    <a href="#sec-tips" data-spy="sec-tips">做T参考</a>
+    <a href="#sec-l1" data-spy="sec-l1"><i class="dot t-good"></i>L1 排雷</a>
+    <a href="#sec-l2" data-spy="sec-l2"><i class="dot t-info"></i>L2 质量</a>
+    <a href="#sec-l3" data-spy="sec-l3"><i class="dot t-warn"></i>L3 增长</a>
+    <a href="#sec-l4" data-spy="sec-l4"><i class="dot t-good"></i>L4 估值</a>
+    <a href="#sec-l5" data-spy="sec-l5"><i class="dot t-muted"></i>L5 筹码</a>
+    <a href="#sec-notes" data-spy="sec-notes">口径</a>
+  </div>
+</nav>
+
+<main class="wrap" id="main">
+
+  <!-- 空状态 -->
+  <section class="welcome" id="welcome">
+    <div class="welcome-card">
+      <h1>五层基本面 · 深度分析</h1>
+      <p class="lead">输入任意 A 股代码，实时联网抓取最近 6 年财报、6 年估值分位、两融、分红与一致预期，按 <b>L1 排雷 → L2 盈利质量 → L3 增长稳定性 → L4 估值 → L5 资金筹码</b> 逐层展开，每一项都给出数值、阈值与结论。</p>
+      <div class="samples" id="samples">
+        <button data-code="002475">002475 立讯精密</button>
+        <button data-code="600519">600519 贵州茅台</button>
+        <button data-code="600406">600406 国电南瑞</button>
+        <button data-code="300033">300033 同花顺</button>
+        <button data-code="002315">002315 焦点科技</button>
+      </div>
+      <div class="welcome-history" id="historyBox" hidden>
+        <span class="muted">最近查看</span>
+        <div id="historyList" class="samples small"></div>
+      </div>
+      <div class="welcome-cta">
+        <button class="scan-btn" id="scanCta">一键扫描全 A 股（主板）</button>
+        <button class="ghost" id="watchCta">★ 特别关注</button>
+        <button class="ghost" id="limitupCta">⚡ 放量涨停</button>
+        <button class="ghost" id="indicesCta">◍ 全球指数</button>
+        <button class="ghost" id="premarketCta">◔ 美股盘前</button>
+        <span class="muted">剔除 ST / 创业板 / 科创板，约 30 秒出一张 3000 只的排名表</span>
+      </div>
+      <ul class="welcome-points">
+        <li><b>实时</b>：每次查询直接请求东方财富数据中心，不走本地数据库；价格、财报、估值分位均为最新可得数据。</li>
+        <li><b>可追溯</b>：每个指标都写明口径、阈值和判定（通过 / 警告 / 淘汰），不平白给一个分数。</li>
+        <li><b>图表</b>：日 / 周 / 月 K 线（含 MA5/10/20/60 与成交量）、营收利润趋势、单季增速、ROE、PE 历史带、年末 PE、行业对比、两融趋势。</li>
+        <li><b>高抛低吸</b>：报告页实时显示日内高低位参考；特别关注列表每 30 秒刷新，靠近日内高点 / 低点时弹出提示。</li>
+        <li><b>放量涨停</b>：每日抓取涨停 / 炸板 / 昨日涨停池，筛出大放量个股，补充封板质量、连板与板块、技术位置、市场情绪，并用近 3 年同类样本统计次日涨停 / 大涨频率（附样本量与置信区间）。</li>
+        <li><b>独立</b>：与桌面版《五层基本面评分》完全独立，不读写它的任何文件。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 报告（内容由 app.js 生成） -->
+  <div id="report" hidden></div>
+
+  <!-- 加载 -->
+  <section class="loading" id="loading" hidden>
+    <div class="spinner"></div>
+    <div class="loading-txt" id="loadingTxt">正在联网抓取财报与估值数据…</div>
+    <div class="loading-sub">首次分析约 5~10 秒（要拉 6 年财报 + 6 年日频估值 + 同行对比）</div>
+  </section>
+
+  <!-- 错误 -->
+  <section class="error-box" id="errorBox" hidden>
+    <h2 id="errorTitle">分析失败</h2>
+    <p id="errorMsg"></p>
+    <p class="muted" id="errorHint"></p>
+    <button class="err-btn" id="retryBtn" hidden>重试</button>
+  </section>
+
+  <!-- 全 A 股扫描 -->
+  <section class="scan" id="scanView" hidden>
+    <div class="card scan-head">
+      <div class="scan-head-main">
+        <h2>全 A 股扫描 <span class="tag">初筛</span></h2>
+        <p class="muted">范围：沪深主板，自动剔除 <b>ST / 退市整理 / 创业板 / 科创板 / 北交所</b>。用东方财富全市场年报与估值表横向打分，一次约 20~40 秒。</p>
+      </div>
+      <div class="scan-act">
+        <button class="scan-btn" id="scanStart">开始扫描</button>
+        <button class="ghost" id="scanDeep" hidden>深度分析前 20 只</button>
+        <button class="ghost" id="scanCsv" hidden>导出 CSV</button>
+      </div>
+    </div>
+
+    <div class="card scan-prog" id="scanProgress" hidden>
+      <div class="sp-line"><b id="scanPhase">准备中</b><span class="muted" id="scanCount"></span></div>
+      <div class="sp-bar"><i id="scanBar"></i></div>
+    </div>
+
+    <div class="card scan-tools" id="scanToolbar" hidden>
+      <input id="scanSearch" type="text" placeholder="搜索代码 / 名称 / 行业" spellcheck="false">
+      <select id="scanRating">
+        <option value="">全部评级</option>
+        <option value="A">A（≥75）</option>
+        <option value="B">B（65~75）</option>
+        <option value="C">C（55~65）</option>
+        <option value="D">D（&lt;55）</option>
+      </select>
+      <span class="muted scan-meta" id="scanMeta"></span>
+    </div>
+
+    <div id="scanTableWrap"></div>
+
+    <p class="scan-note muted">口径：质量 40%（ROE 均值 / 最低 / 波动、毛利率、现金含量）＋ 成长 25%（营收、净利 CAGR 与稳定性）＋ 估值 35%（行业内 PE、PB 分位、PEG）。<b>这是初筛</b>，不含现金流造假、商誉、质押等逐票排雷；点任意一行可进入完整五层分析。</p>
+  </section>
+  <section class="deep" id="deepView" hidden>
+    <div class="deep-head">
+      <h1 class="deep-title">资金面 · 技术面 深度分析</h1>
+      <p class="deep-sub muted">输入一个或多个 6 位代码（空格 / 逗号 / 换行分隔，单次最多 20 只）。实时联网取：日 / 周 / 月 K 线、主力资金流、北向持股、两融余额、龙虎榜、股东户数、增减持、解禁、大宗交易、行业与大盘资金。</p>
+    </div>
+
+    <div class="deep-input">
+      <textarea id="deepInput" rows="2" spellcheck="false" placeholder="例如：002475 600519 601398  （多只用空格、逗号或换行分隔）"></textarea>
+      <div class="deep-actions">
+        <button class="scan-btn" id="deepRun">开始分析</button>
+        <button class="ghost" id="deepClear">清空</button>
+      </div>
+    </div>
+
+    <div class="deep-chips" id="deepChips">
+      <span class="muted">快速填入：</span>
+      <button data-sample="002475">立讯精密</button>
+      <button data-sample="600519">贵州茅台</button>
+      <button data-sample="601398">工商银行</button>
+      <button data-sample="002463">沪电股份</button>
+    </div>
+
+    <div class="deep-progress" id="deepProgress" hidden>
+      <div class="sp-bar"><i id="deepBar"></i></div>
+      <span id="deepStatus" class="muted"></span>
+    </div>
+
+    <div id="deepSummary"></div>
+    <div id="deepResults"></div>
+
+    <p class="scan-note muted">口径：技术分 = 趋势 30 ＋ 结构 20 ＋ 指标 20 ＋ 量价 15 ＋ 相对强弱 15；资金分 = 量能 15 ＋ 主力流向 30 ＋ 北向 15 ＋ 杠杆 15 ＋ 席位股东 15 ＋ 环境 10。分值用于横向比较，不构成投资建议。</p>
+  </section>
+
+    <!-- 资讯雷达 -->
+    <section class="news" id="newsView" hidden>
+      <div class="news-head">
+        <div>
+          <h2>资讯雷达 <span class="tag">实时</span></h2>
+          <p class="muted">聚合东方财富 7×24 快讯、新浪 7×24 与公司公告，自动标注<b>受影响板块</b>和<b>相关个股</b>。每 2 分钟自动刷新，只作线索，不构成投资建议。</p>
+        </div>
+        <div class="news-act">
+          <span class="muted" id="newsTime">—</span>
+          <label class="nswitch"><input type="checkbox" id="newsAuto" checked><span>自动刷新</span></label>
+          <button class="ghost" id="newsRefresh">刷新</button>
+        </div>
+      </div>
+      <div class="news-search">
+        <input id="newsSearch" placeholder="输入 6 位代码或股票名称，查看它最近的公告与新闻">
+        <button class="primary" id="newsGo">搜索</button>
+      </div>
+      <div class="nchips" id="newsChips"></div>
+      <div id="newsStock" hidden></div>
+      <div id="newsList"></div>
+      <p class="news-note">板块与个股标注由关键词规则自动生成：实心为新闻直接点名，浅色为同板块关联标的，可能存在误判，请点「原文」核对。</p>
+    </section>
+
+    <!-- 特别关注（自选股） -->
+    <section class="watch" id="watchView" hidden>
+      <div class="card watch-head">
+        <div class="watch-head-main">
+          <h2>特别关注 <span class="tag">自选股</span></h2>
+          <p class="muted">把想持续盯住的股票放进来。页面打开期间每 30 秒自动刷新行情，触发涨跌幅、换手率、量比、振幅等阈值，或现价靠近日内高点 / 低点时，会在页面底部弹出提醒，也可以开启桌面通知。</p>
+        </div>
+        <div class="watch-add">
+          <input id="watchInput" type="text" inputmode="numeric" maxlength="6" placeholder="输入 6 位代码，如 002475" spellcheck="false">
+          <button class="scan-btn" id="watchAddBtn">加入关注</button>
+          <button class="ghost" id="watchRefresh">刷新行情</button>
+        </div>
+      </div>
+
+      <div class="card watch-settings">
+        <div class="ws-item">涨跌幅 ≥ <input id="wsChange" type="number" min="0.5" max="30" step="0.5" value="5"> %</div>
+        <div class="ws-item">换手率 ≥ <input id="wsTurnover" type="number" min="0.5" max="100" step="0.5" value="10"> %</div>
+        <div class="ws-item">量比 ≥ <input id="wsVol" type="number" min="0.5" max="20" step="0.1" value="2"></div>
+        <div class="ws-item">振幅 ≥ <input id="wsAmp" type="number" min="0.5" max="50" step="0.5" value="8"> %</div>
+        <div class="ws-item">高抛：距日高 ≤ <input id="wsHigh" type="number" min="0.1" max="10" step="0.1" value="1"> %</div>
+        <div class="ws-item">低吸：距日低 ≤ <input id="wsLow" type="number" min="0.1" max="10" step="0.1" value="1"> %</div>
+        <label class="ws-toggle"><input type="checkbox" id="wsTips" checked> 高抛低吸提醒</label>
+        <button class="ghost" id="watchSaveSettings">保存阈值</button>
+        <button class="ghost" id="watchNotify">开启桌面通知</button>
+        <span class="muted" id="watchNotifyState"></span>
+      </div>
+
+      <div class="watch-stats" id="watchStats"></div>
+      <div class="watch-tips" id="watchTips"></div>
+      <div id="watchAlerts"></div>
+      <div id="watchList"></div>
+
+      <p class="scan-note muted">提醒只针对特别关注列表里的股票，按当前阈值机械判断，不构成投资建议。列表保存在网页版目录下的 <b>watchlist.json</b>，与桌面版《五层基本面评分》完全独立。</p>
+    </section>
+
+    <!-- 放量涨停研究 -->
+    <section class="limitup" id="limitupView" hidden>
+      <div class="card limitup-head">
+        <div class="limitup-head-main">
+          <h2>放量涨停研究 <span class="tag">封板质量 + 历史频率</span></h2>
+          <p class="muted">从当日涨停池中筛出<b>大放量</b>个股，补充封单、首封时间、炸板、连板、板块效应、技术位置与市场情绪，并用该股近 3 年同类涨停样本统计次日表现。概率是历史频率 + 市场基准平滑，<b>不是预测</b>。</p>
+        </div>
+        <div class="limitup-act">
+          <span class="muted" id="limitupMeta">—</span>
+          <label class="nswitch"><input type="checkbox" id="limitupAuto" checked><span>自动刷新</span></label>
+          <button class="ghost" id="limitupRefresh">刷新</button>
+        </div>
+      </div>
+
+      <div id="limitupListWrap">
+        <div id="limitupSentiment"></div>
+        <div class="card limitup-filters" id="limitupFilters">
+          <label>量比 ≥ <input id="luVolRatio" type="number" min="0" max="50" step="0.1" value="2"></label>
+          <label>换手 ≥ <input id="luTurnover" type="number" min="0" max="100" step="0.5" value="5"> %</label>
+          <label>成交额 ≥ <input id="luAmount" type="number" min="0" max="1000" step="0.5" value="1"> 亿</label>
+          <label>连板
+            <select id="luBoard">
+              <option value="all">全部</option>
+              <option value="first">首板</option>
+              <option value="multi">2 板及以上</option>
+            </select>
+          </label>
+          <label class="lu-check"><input type="checkbox" id="luSealed"> 仅未炸板</label>
+          <label>排序
+            <select id="luSort">
+              <option value="score">综合强度</option>
+              <option value="volRatio">量比</option>
+              <option value="sealRatio">封单 / 流通市值</option>
+              <option value="amount">成交额</option>
+              <option value="firstSeal">首次封板时间</option>
+              <option value="streak">连板高度</option>
+            </select>
+          </label>
+          <button class="scan-btn" id="luApply">筛选</button>
+          <button class="ghost" id="luReset">重置</button>
+          <span class="muted lu-count" id="luCount"></span>
+        </div>
+        <div id="limitupList"></div>
+        <p class="scan-note muted">口径：大放量默认「量比 ≥ 2、换手率 ≥ 5%、成交额 ≥ 1 亿元」，阈值可调。涨停池、炸板池、昨日涨停池来自东方财富，量比 / 换手 / 成交额由腾讯实时行情补充。列表按当日收盘数据机械筛选，<b>不构成投资建议</b>。</p>
+      </div>
+
+      <div id="limitupDetail" hidden></div>
+    </section>
+
+    <!-- 全球主要指数 -->
+    <section class="indices" id="indicesView" hidden>
+      <div class="card indices-head">
+        <div>
+          <h2>全球主要指数 <span class="tag">实时看板</span></h2>
+          <p class="muted">覆盖中国内地、中国香港、亚太、欧洲、美洲的主要指数。A 股、港股、日经、韩国、新加坡等按实时行情展示；欧洲、美洲及其他休市市场显示最近一个交易日的收盘数据。</p>
+        </div>
+        <div class="indices-act">
+          <span class="muted" id="indicesMeta">—</span>
+          <button class="ghost" id="indicesRefresh">刷新</button>
+        </div>
+      </div>
+      <div class="idx-summary" id="indicesSummary"></div>
+      <div id="indicesGroups"></div>
+      <p class="scan-note muted">数据来源：腾讯（A 股）、新浪（港股 / 日经 / KOSPI / 欧洲 / 美股等）、CNBC（马来西亚等）、SET 官网（泰国）。每张卡片标注真实行情时间与状态，休市或未开盘不会伪造涨跌。</p>
+    </section>
+
+    <!-- 美股盘前 -->
+    <section class="premarket" id="premarketView" hidden>
+      <div class="card pm-head">
+        <div class="pm-head-main">
+          <h2>美股盘前 <span class="tag" id="pmSessionTag">—</span></h2>
+          <p class="muted">三大期指 + 热门美股 / 纳斯达克100 成分股盘前、盘后延时段行情。时间统一标注美东 ET，红涨绿跌，与 A 股习惯一致。</p>
+        </div>
+        <div class="pm-head-act">
+          <span class="muted" id="premarketStatus">—</span>
+          <button class="ghost" id="premarketRefresh">刷新</button>
+        </div>
+      </div>
+
+      <div class="idx-summary" id="pmSummary"></div>
+      <div class="pm-futures" id="premarketFutures"></div>
+
+      <div class="card pm-tools">
+        <div class="pm-pools" id="premarketPools" role="group" aria-label="行情列表"></div>
+        <div class="pm-tools-row">
+          <span class="pm-tools-label">自选代码</span>
+          <input id="premarketInput" type="text" maxlength="400" placeholder="如 AAPL,TSLA,NVDA（最多 40 只）" autocomplete="off" spellcheck="false" aria-label="自定义美股代码">
+          <button class="scan-btn" id="premarketApply">查看</button>
+          <button class="ghost" id="premarketReset">恢复热门池</button>
+          <label class="pm-auto"><input type="checkbox" id="premarketAuto" checked> 15 秒自动刷新</label>
+          <span class="muted" id="pmMeta"></span>
+        </div>
+        <p class="pm-hint muted">支持美股 / ETF 代码，可用逗号、空格分隔（如 BRK.B）。留空则展示默认热门池；自定义列表只保存在本机浏览器。「纳斯达克100」可查看全部成分股。</p>
+      </div>
+
+      <div id="premarketGroups"></div>
+
+      <p class="scan-note muted">数据来源：新浪财经美股行情（盘前 / 盘后延时段 + 三大期指）。行情可能延迟；个股无延时段数据时显示正股最新收盘。本页只做行情展示，<b>不构成投资建议</b>。</p>
+    </section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <p class="foot-note">数据来源：东方财富公开数据中心（datacenter-web）+ 腾讯行情快照 · 工具仅做机械筛选，<b>不构成投资建议</b></p>
+    <p class="foot-meta" id="footMeta"></p>
+  </div>
+</footer>
+
+<script src="js/engine.js"></script>
+<script src="js/data.js"></script>
+<script src="js/shim.js"></script>
+<script src="app.js"></script>
+<script src="js/pwa.js"></script>
+</body>
+</html>
