@@ -1,12 +1,13 @@
 /* Service Worker：只缓存"壳"（页面/样式/脚本/图标），
    /api/* 全部走本地计算，不经过缓存；数据本身永远实时联网取。 */
-const CACHE = 'wb-wugc-v3';
+const CACHE = 'wb-wugc-v4';
 const SHELL = [
   './index.html',
   './style.css?v=2',
   './app.js?v=2',
   './js/engine.js?v=2',
   './js/data.js?v=2',
+  './js/deep.js?v=3',
   './js/shim.js?v=2',
   './js/pwa.js',
   './manifest.webmanifest',
