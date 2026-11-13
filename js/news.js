@@ -209,41 +209,38 @@
     return out;
   }
 
-  /* ---------- 原始资讯 ---------- */
+  /* ---------- 原始资讯 ----------
+     东财 7×24 快讯接口(np-weblist)与新浪 7×24 都不发跨域头，浏览器里读不到，
+     因此手机版改用东财"资讯检索"接口（带 ACAO:*）按多个主题关键词并发取稿件，
+     合并去重后按时间倒序；个股公告仍走 np-anotice（同样跨域开放）。 */
+  var KEYS = ['A股', '涨停', '央行 政策', '半导体', '算力 光模块', '新能源 锂电', '医药 创新药',
+    '房地产', '券商', '军工', '有色金属', '美股 美联储', '光伏', '汽车 智驾', '白酒 消费', '机器人'];
+
   async function rawNews() {
     var out = [];
-    var trace = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-      var r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    var jobs = KEYS.map(function (kw) {
+      var param = '{"uid":"","keyword":"' + kw + '","type":["cmsArticleWebOld"],"client":"web","clientType":"web","clientVersion":"curr","param":{"cmsArticleWebOld":{"searchScope":"default","sort":"time","pageIndex":1,"pageSize":20,"preTag":"","postTag":""}}}';
+      return getText('https://search-api-web.eastmoney.com/search/jsonp?cb=cb&param=' + encodeURIComponent(param), 12000);
     });
-    var t1 = await getText('https://np-weblist.eastmoney.com/comm/web/getFastNewsList?client=web&biz=web_724&fastColumn=102&sortEnd=&pageSize=100&req_trace=' + trace, 12000);
-    if (t1) {
+    var res = await Promise.all(jobs);
+    res.forEach(function (t) {
+      if (!t) return;
+      var i = t.indexOf('('), j = t.lastIndexOf(')');
+      if (i < 0 || j <= i) return;
+      var rows;
       try {
-        var j1 = JSON.parse(t1);
-        (j1.data && j1.data.fastNewsList ? j1.data.fastNewsList : []).forEach(function (x) {
-          out.push({
-            time: String(x.showTime || ''), title: String(x.title || ''), summary: String(x.summary || ''),
-            src: '东财快讯', url: 'https://finance.eastmoney.com/a/' + String(x.code || '') + '.html', codes: x.stockList || []
-          });
+        var o = JSON.parse(t.slice(i + 1, j));
+        rows = o.result && o.result.cmsArticleWebOld ? o.result.cmsArticleWebOld : [];
+      } catch (e) { return; }
+      (rows || []).forEach(function (x) {
+        out.push({
+          time: String(x.date || ''), title: String(x.title || ''), summary: String(x.content || ''),
+          src: String(x.mediaName || '东方财富资讯'),
+          url: String(x.url || '').replace(/^http:/, 'https:'),
+          codes: []
         });
-      } catch (e) {}
-    }
-    var t2 = await getText('https://zhibo.sina.com.cn/api/zhibo/feed?page=1&page_size=50&zhibo_id=152&tag_id=0&dire=f&dpc=1', 12000);
-    if (t2) {
-      try {
-        var j2 = JSON.parse(t2);
-        var list = j2.result && j2.result.data && j2.result.data.feed ? j2.result.data.feed.list : [];
-        (list || []).forEach(function (x) {
-          var txt = String(x.rich_text || ''), url = '';
-          try { var ext = JSON.parse(String(x.ext || '{}')); url = String(ext.docurl || ''); } catch (e) {}
-          var title = txt, summary = '';
-          var mm = txt.match(/^【([^】]+)】(.*)$/);
-          if (mm) { title = mm[1]; summary = mm[2]; }
-          else if (txt.length > 60) { title = txt.slice(0, 60) + '…'; summary = txt; }
-          out.push({ time: String(x.create_time || ''), title: title, summary: summary, src: '新浪7x24', url: url, codes: [] });
-        });
-      } catch (e) {}
-    }
+      });
+    });
     return out;
   }
 
