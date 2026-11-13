@@ -1,19 +1,19 @@
 /* Service Worker：壳走"网络优先 + 离线回退"，保证更新即时生效；
    /api/* 与第三方数据一律走网络，不缓存。 */
-const CACHE = 'wb-wugc-v11';
+const CACHE = 'wb-wugc-v12';
 const SHELL = [
   './index.html',
   './style.css?v=2',
   './app.js?v=2',
   './js/engine.js?v=2',
-  './js/data.js?v=2',
+  './js/data.js?v=3',
   './js/deep.js?v=3',
   './js/news.js?v=7',
   './js/indices.js?v=5',
   './js/premarket.js?v=5',
   './js/limitup.js?v=1',
   './js/scan.js?v=1',
-  './js/shim.js?v=11',
+  './js/shim.js?v=12',
   './js/pwa.js?v=5',
   './manifest.webmanifest',
   './icon-192.png',
