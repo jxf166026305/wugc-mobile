@@ -86,7 +86,13 @@
     '/api/uspremarket': async function () { return notYet('美股盘前'); },
     '/api/limitup': async function () { return notYet('放量涨停研究'); },
     '/api/limitup/detail': async function () { return notYet('涨停个股详情'); },
-    '/api/deep': async function () { return notYet('资金面 / 技术面深度分析'); },
+    '/api/deep': async function (u) {
+      var code = (u.searchParams.get('code') || '').trim();
+      if (!/^\d{6}$/.test(code)) return { ok: false, error: '请输入 6 位 A 股代码' };
+      var force = u.searchParams.get('refresh') === '1';
+      if (!root.DeepLayer) return { ok: false, error: '深度模块未加载' };
+      return await root.DeepLayer.deep(code, force);
+    },
     '/api/scan/start': async function () { return notYet('全 A 股扫描'); },
     '/api/scan/status': async function () { return { ok: true, running: false, done: 0, total: 0, rows: [], error: '手机独立版暂未开放扫描' }; },
     '/api/scan/result': async function () { return { ok: true, rows: [] }; }
