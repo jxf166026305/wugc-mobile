@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "settings": { "changePct": 5, "turnover": 10, "volRatio": 2, "amplitude": 8, "highPct": 1, "lowPct": 1, "tipsOn": true },
+  "items": []
+}
