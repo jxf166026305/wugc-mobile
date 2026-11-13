@@ -208,21 +208,32 @@
   async function rawKline(secid, klt, lmt) {
     var u = P2H + '/api/qt/stock/kline/get?secid=' + secid + '&klt=' + klt + '&fqt=1&lmt=' + lmt +
       '&end=20500101&iscca=1&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61';
-    var r = await fetch(u, { headers: { Accept: '*/*' } });
-    if (!r.ok) return null;
-    var j = await r.json();
-    if (!j || !j.data || !j.data.klines) return null;
-    var bars = j.data.klines.map(function (s) {
-      var a = String(s).split(',');
-      return {
-        d: a[0], o: num(a[1]), c: num(a[2]), h: num(a[3]), l: num(a[4]),
-        v: num(a[5]), amt: num(a[6]), pct: num(a[8]), turn: num(a[10])
-      };
-    });
-    return { name: (j.data.name || ''), bars: bars };
+    try {
+      var r = await fetch(u, { headers: { Accept: '*/*' } });
+      if (r.ok) {
+        var j = await r.json();
+        if (j && j.data && j.data.klines) {
+          var bars = j.data.klines.map(function (s) {
+            var a = String(s).split(',');
+            return {
+              d: a[0], o: num(a[1]), c: num(a[2]), h: num(a[3]), l: num(a[4]),
+              v: num(a[5]), amt: num(a[6]), pct: num(a[8]), turn: num(a[10])
+            };
+          });
+          return { name: (j.data.name || ''), bars: bars };
+        }
+      }
+    } catch (e) { /* 东财不可用，走下面兜底 */ }
+    // 兜底：与电脑版 Get-KlineAny 一致，东财失败切腾讯
+    try {
+      var code = String(secid).split('.')[1];
+      var k = await root.DataLayer.kline(code, klt, lmt);
+      if (k && k.ok && k.bars && k.bars.length) return { name: (k.name || ''), bars: k.bars };
+    } catch (e2) { }
+    return null;
   }
 
-  async function flowBars(secid, lmt) {
+  async function flowBarsEm(secid, lmt) {
     var u = P2H + '/api/qt/stock/fflow/daykline/get?lmt=' + lmt + '&klt=101&secid=' + secid +
       '&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63';
     try {
@@ -235,6 +246,33 @@
         return { d: p[0], main: num(p[1]), small: num(p[2]), mid: num(p[3]), big: num(p[4]), super: num(p[5]) };
       }).filter(function (x) { return isFinite(x.main); });
     } catch (e) { return null; }
+  }
+
+  /* 新浪资金流兜底：与电脑版 Get-FlowSina 同源（东财不可用时使用） */
+  async function flowBarsSina(code, days) {
+    var sym = (/^(6|9)/.test(code) ? 'sh' : 'sz') + code;
+    var u = 'https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/MoneyFlow.ssl_qsfx_zjlrqs' +
+      '?page=1&num=' + days + '&sort=opendate&asc=0&daima=' + sym;
+    try {
+      var r = await fetch(u, { headers: { Accept: '*/*' } });
+      if (!r.ok) return null;
+      var arr = await r.json();
+      if (!arr || !arr.length) return null;
+      var out = arr.map(function (x) {
+        var main = num(x.netamount), sup = num(x.r0_net);
+        return { d: String(x.opendate), main: main, super: sup, big: main - sup, mid: NaN, small: NaN };
+      });
+      out.reverse();
+      return out;
+    } catch (e) { return null; }
+  }
+
+  async function flowBars(secid, lmt) {
+    var em = await flowBarsEm(secid, lmt);
+    if (em && em.length > 5) { em.src = 'eastmoney'; return em; }
+    var sn = await flowBarsSina(String(secid).split('.')[1], 30);
+    if (sn) { sn.src = 'sina'; }
+    return sn;
   }
 
   async function idxQuote() {
@@ -485,6 +523,8 @@
       }
       fund = {
         ok: true,
+        src: flow.src || '',
+        srcNote: flow.src === 'sina' ? '东财资金流暂不可用，本次为新浪口径（净流入含全部单，与东财"主力净流入"不完全可比）' : '',
         today: Rnd(fMain / 1e8, 2), super: Rnd(fSuper / 1e8, 2), big: Rnd(fBig / 1e8, 2),
         mid: Rnd(fMid / 1e8, 2), small: Rnd(fSmall / 1e8, 2),
         d3: Rnd(f3 / 1e8, 2), d5: Rnd(f5 / 1e8, 2), d10: Rnd(f10 / 1e8, 2), d20: Rnd(f20 / 1e8, 2),
