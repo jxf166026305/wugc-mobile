@@ -1100,7 +1100,7 @@
     }
     if (isNum(L.implied)) {
       pts.push('动态 PE 隐含增速 <b>' + pf(L.implied, 1) + '</b>，对比扣非 3 年 CAGR <b>' + pf(d.l3.dedCagr, 1) + '</b>' +
-        (L.implied <= (d.l3.dedCagr || 0) ? '，估值没有跑在增速前面' : '，估值略跑在增速前面'));
+        (isNum(d.l3.dedCagr) ? (L.implied <= d.l3.dedCagr ? '，估值没有跑在增速前面' : '，估值略跑在增速前面') : '（扣非 CAGR 不可算，无法对比增速）'));
     }
 
     var ye = L.yearEnd || [];
