@@ -1,6 +1,6 @@
-/* Service Worker：只缓存"壳"（页面/样式/脚本/图标），
-   /api/* 全部走本地计算，不经过缓存；数据本身永远实时联网取。 */
-const CACHE = 'wb-wugc-v4';
+/* Service Worker：壳走"网络优先 + 离线回退"，保证更新即时生效；
+   /api/* 与第三方数据一律走网络，不缓存。 */
+const CACHE = 'wb-wugc-v5';
 const SHELL = [
   './index.html',
   './style.css?v=2',
@@ -8,8 +8,8 @@ const SHELL = [
   './js/engine.js?v=2',
   './js/data.js?v=2',
   './js/deep.js?v=3',
-  './js/shim.js?v=2',
-  './js/pwa.js',
+  './js/shim.js?v=5',
+  './js/pwa.js?v=2',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png'
@@ -36,20 +36,14 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
+  // 同源静态资源：网络优先，失败再吃缓存
   e.respondWith(
-    caches.match(req).then((hit) => {
-      if (hit) {
-        // 后台更新，下次生效
-        fetch(req).then((r) => { if (r && r.ok) caches.open(CACHE).then((c) => c.put(req, r.clone())); }).catch(() => {});
-        return hit;
+    fetch(req).then((r) => {
+      if (r && r.ok) {
+        const copy = r.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
       }
-      return fetch(req).then((r) => {
-        if (r && r.ok && (req.destination === 'script' || req.destination === 'style' || req.destination === 'document')) {
-          const copy = r.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy));
-        }
-        return r;
-      }).catch(() => caches.match('./index.html'));
-    })
+      return r;
+    }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
   );
 });
