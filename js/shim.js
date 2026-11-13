@@ -80,8 +80,22 @@
       return await Data.watchSettings(u.searchParams);
     },
 
-    '/api/news': async function () { return notYet('资讯雷达'); },
-    '/api/news/stock': async function () { return notYet('个股资讯'); },
+    '/api/news': async function (u) {
+      if (!root.NewsLayer) return { ok: false, error: '资讯模块未加载' };
+      return await root.NewsLayer.feed(u, u.searchParams.get('refresh'));
+    },
+
+    '/api/news/stock': async function (u) {
+      var code = (u.searchParams.get('code') || '').trim();
+      var q = (u.searchParams.get('q') || '').trim();
+      if (!root.NewsLayer) return { ok: false, error: '资讯模块未加载' };
+      if (q) {
+        var list = await root.NewsLayer.search(q, 20);
+        return { ok: true, code: '', name: q, industry: '', ann: [], news: list, peers: [] };
+      }
+      if (!/^\d{6}$/.test(code)) return { ok: false, error: '请输入 6 位 A 股代码' };
+      return await root.NewsLayer.forStock(code);
+    },
     '/api/indices': async function () { return notYet('全球指数'); },
     '/api/uspremarket': async function () { return notYet('美股盘前'); },
     '/api/limitup': async function () { return notYet('放量涨停研究'); },
