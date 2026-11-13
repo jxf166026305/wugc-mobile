@@ -138,7 +138,7 @@
     var klt = '101', pname = 'day';
     if (period === 'week' || period === '102') { klt = '102'; pname = 'week'; }
     else if (period === 'month' || period === '103') { klt = '103'; pname = 'month'; }
-    limit = Math.min(260, Math.max(30, Number(limit) || 120));
+    limit = Math.min(800, Math.max(30, Number(limit) || 120));
     var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid(code) +
       '&klt=' + klt + '&fqt=1&lmt=' + limit + '&end=20500101' +
       '&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61';
