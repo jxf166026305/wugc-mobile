@@ -105,6 +105,11 @@
 
     if (!url.pathname.startsWith('/api/')) return originalFetch(input, init);
 
+    // 只接管本页面自己的 /api/*：东方财富数据接口的路径也是 /api/data/...，
+    // 若只看前缀会把它们误拦成 404，这里必须同时校验同源。
+    var here = root.location ? root.location.origin : '';
+    if (url.origin !== here) return originalFetch(input, init);
+
     var handler = routes[url.pathname];
     if (!handler) return json({ ok: false, error: '手机版没有这个接口：' + url.pathname });
 
