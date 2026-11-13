@@ -104,7 +104,10 @@
 ## 自检命令
 
 ```bash
-node test/parity.js    # 与电脑版逐字段对账，应输出 差异 0
+node test/parity.js    # 五层评分与电脑版逐字段对账，应输出 差异 0
+node test/deep.js      # 深度页 157 字段对账
+node test/limitup.js   # 涨停列表 / 情绪 / 个股详情对账
+node test/scan.js      # 全 A 扫描逐字段对账（估值分除外，原因见上）
 node test/shim.js      # 模拟浏览器跑 /api/* 全链路
 ```
 
