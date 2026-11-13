@@ -106,8 +106,14 @@
       var codes = String(u.searchParams.get('codes') || '').split(/[,，\s]+/).filter(function (x) { return x; });
       return await root.PremarketLayer.list(preset, codes, u.searchParams.get('refresh') === '1');
     },
-    '/api/limitup': async function () { return notYet('放量涨停研究'); },
-    '/api/limitup/detail': async function () { return notYet('涨停个股详情'); },
+    '/api/limitup': async function (u) {
+      if (!root.LimitUpLayer) return { ok: false, error: '涨停模块未加载' };
+      return await root.LimitUpLayer.list(u.searchParams);
+    },
+    '/api/limitup/detail': async function (u) {
+      if (!root.LimitUpLayer) return { ok: false, error: '涨停模块未加载' };
+      return await root.LimitUpLayer.detail(u.searchParams);
+    },
     '/api/deep': async function (u) {
       var code = (u.searchParams.get('code') || '').trim();
       if (!/^\d{6}$/.test(code)) return { ok: false, error: '请输入 6 位 A 股代码' };
