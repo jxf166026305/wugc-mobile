@@ -185,6 +185,23 @@
     var t10 = emGet('RPTA_WEB_RZRQ_GGMX', { filter: '(SCODE="' + code + '")', sort: 'DATE', pageSize: 25, cols: 'DATE,RZYE,RZYEZB' });
 
     var rs = await Promise.all([t1, t2, t3, t4, t5, t6, t7, t8, t9, t10]);
+    if (!(rs[3] && rs[3].data && rs[3].data.length > 0)) throw new Error('未取到估值数据：可能是东财接口限流（稍后重试即可），也可能该代码在估值库中无记录（北交所 43/83 开头旧代码多已变更为 92 开头，请换新代码查询）');
+    var balList = (rs[1].data || []);
+    if (balList.length === 0) {
+      var balAlt = ['RPT_F10_FINANCE_BBALANCE', 'RPT_F10_FINANCE_IBALANCE', 'RPT_F10_FINANCE_SBALANCE'];
+      for (var bi = 0; bi < balAlt.length; bi++) {
+        var br = await emGet(balAlt[bi], { cols: balCols, filter: f, pageSize: 60 });
+        if (br && br.data && br.data.length > 0) { balList = br.data; break; }
+      }
+    }
+    var cfList = (rs[2].data || []);
+    if (cfList.length === 0) {
+      var cfAlt = ['RPT_F10_FINANCE_BCASHFLOW', 'RPT_F10_FINANCE_ICASHFLOW', 'RPT_F10_FINANCE_SCASHFLOW'];
+      for (var ci = 0; ci < cfAlt.length; ci++) {
+        var cr = await emGet(cfAlt[ci], { cols: 'REPORT_DATE,NETCASH_OPERATE', filter: f, pageSize: 60 });
+        if (cr && cr.data && cr.data.length > 0) { cfList = cr.data; break; }
+      }
+    }
     var val = [];
     [rs[3], rs[4], rs[5]].forEach(function (r) {
       if (r && r.data) r.data.forEach(function (x) { if (x) val.push(x); });
@@ -200,8 +217,8 @@
     return {
       Code: code,
       Mf: mf,
-      Bal: (rs[1].data || []),
-      Cf: (rs[2].data || []),
+      Bal: balList,
+      Cf: cfList,
       Val: val,
       Pred: (rs[6].data && rs[6].data.length > 0) ? rs[6].data[0] : null,
       Div: (rs[7].data || []),
@@ -622,8 +639,13 @@
     years.forEach(function (y) { cfoSum += y.cfo; npSum += y.np; });
     var cfRatio = 0;
     if (npSum > 0) cfRatio = cfoSum / npSum;
+    var isFinInd = /银行|保险|证券|多元金融/.test(industry);
 
-    if (npSum <= 0) {
+    if (isFinInd) {
+      l1.push({ item: '现金流含金量', value: '不适用', standard: '金融类单列', verdict: '通过', note: '银行/保险/证券经营现金流受存款贷款变动主导，口径不可比' });
+    } else if (cf.length === 0) {
+      l1.push({ item: '现金流含金量', value: '未取到', standard: 'CFO/净利 ≥1', verdict: '提示', note: '现金流量表接口未返回数据，需人工核对年报现金流' });
+    } else if (npSum <= 0) {
       l1.push({ item: '现金流含金量', value: '5年累计净利≤0', standard: 'CFO/净利 ≥1', verdict: '淘汰', note: '5 年累计归母净利为负，无法用现金流验证利润' });
     } else if (cfRatio >= 1.0) {
       l1.push({ item: '现金流含金量', value: fmt2(cfRatio), standard: 'CFO/净利 ≥1', verdict: '通过', note: '5 年累计经营现金流覆盖归母净利' });
@@ -634,9 +656,10 @@
     }
 
     var cashRatioAvg = avg(years.map(function (y) { return y.cashRatio; }));
-    var isFinInd = /银行|保险|证券|多元金融/.test(industry);
     if (isFinInd) {
       l1.push({ item: '收现比', value: '不适用', standard: '金融类单列', verdict: '通过', note: '金融类销售收现口径不可比，不参与判断' });
+    } else if (cf.length === 0) {
+      l1.push({ item: '收现比', value: '未取到', standard: '≥0.90', verdict: '提示', note: '现金流量表缺失，收现比未计算' });
     } else if (cashRatioAvg >= 0.9) {
       l1.push({ item: '收现比', value: fmt2(cashRatioAvg), standard: '≥0.90', verdict: '通过', note: '收入基本收到现金' });
     } else if (cashRatioAvg >= 0.75) {
@@ -646,7 +669,11 @@
     }
 
     var finLike = /银行|保险|证券|多元金融|房地产/.test(industry);
-    if (latest.debtRatio <= 70) {
+    if (isFinInd) {
+      l1.push({ item: '资产负债率', value: R1(latest.debtRatio).toFixed(1) + '%', standard: '金融类单列', verdict: '警告', note: '银行/保险负债端天然高（含存款），不按一般行业 70% 淘汰' });
+    } else if (bal.length === 0) {
+      l1.push({ item: '资产负债率', value: '未取到', standard: '≤70%', verdict: '提示', note: '资产负债表接口未返回数据，需人工核对' });
+    } else if (latest.debtRatio <= 70) {
       l1.push({ item: '资产负债率', value: R1(latest.debtRatio).toFixed(1) + '%', standard: '≤70%', verdict: '通过', note: '杠杆可控' });
     } else if (latest.debtRatio <= 80) {
       l1.push({ item: '资产负债率', value: R1(latest.debtRatio).toFixed(1) + '%', standard: '≤70%', verdict: '警告', note: '杠杆偏高' });
@@ -656,7 +683,9 @@
       l1.push({ item: '资产负债率', value: R1(latest.debtRatio).toFixed(1) + '%', standard: '≤70%', verdict: '淘汰', note: '杠杆过高，抗风险能力弱' });
     }
 
-    if (latest.intDebtRatio <= 30) {
+    if (isFinInd) {
+      l1.push({ item: '有息负债率', value: '不适用', standard: '金融类单列', verdict: '通过', note: '金融业有息负债含同业/存款等负债端，口径不可比' });
+    } else if (latest.intDebtRatio <= 30) {
       l1.push({ item: '有息负债率', value: R1(latest.intDebtRatio).toFixed(1) + '%', standard: '≤30%', verdict: '通过', note: '有息负债占总资产比例低' });
     } else if (latest.intDebtRatio <= 50) {
       l1.push({ item: '有息负债率', value: R1(latest.intDebtRatio).toFixed(1) + '%', standard: '≤30%', verdict: '警告', note: '有息负债偏高' });
@@ -666,7 +695,9 @@
 
     var gwRatio = 0;
     if (latest.equity > 0) gwRatio = latest.goodwill / latest.equity * 100.0;
-    if (gwRatio <= 20) {
+    if (bal.length === 0) {
+      l1.push({ item: '商誉/净资产', value: '未取到', standard: '≤20%', verdict: '提示', note: '资产负债表缺失，商誉占比未计算' });
+    } else if (gwRatio <= 20) {
       l1.push({ item: '商誉/净资产', value: R1(gwRatio).toFixed(1) + '%', standard: '≤20%', verdict: '通过', note: '商誉减值风险低' });
     } else if (gwRatio <= 30) {
       l1.push({ item: '商誉/净资产', value: R1(gwRatio).toFixed(1) + '%', standard: '≤20%', verdict: '警告', note: '商誉偏高，注意减值' });
@@ -734,6 +765,13 @@
     var gmNow = years5[0].gm;
     var gmOld = years5[years5.length - 1].gm;
     var gmDelta = gmNow - gmOld;
+    // 金融业没有可比"毛利率"，用净利率稳定性替代，避免毛利项按 0 而白送满分
+    if (isFinInd) {
+      var nmNow = 0, nmOld = 0;
+      if (years5[0].revenue > 0) nmNow = years5[0].np / years5[0].revenue * 100.0;
+      if (years5[years5.length - 1].revenue > 0) nmOld = years5[years5.length - 1].np / years5[years5.length - 1].revenue * 100.0;
+      gmDelta = nmNow - nmOld;
+    }
 
     var s2 = 0;
     if (roeAvg >= MIN_ROE) s2 += 40;
@@ -755,7 +793,7 @@
 
     var lev = 0;
     if (latest.equity > 0) lev = latest.totalAssets / latest.equity;
-    if (lev > 2.5) s2 = s2 * 0.85;
+    if (lev > 2.5 && !isFinInd) s2 = s2 * 0.85;
 
     if (s2 < 0) s2 = 0;
     if (s2 > 100) s2 = 100;
@@ -774,11 +812,11 @@
     });
 
     /* ---------------- L3 增长稳定性 ---------------- */
-    var revCagr = 0, dedCagr = 0;
+    var revCagr = 0, dedCagr = 0, hasRevCagr = false, hasDedCagr = false;
     if (years.length >= 4) {
       var y0 = years[0], y3 = years[3];
-      if (y3.revenue > 0 && y0.revenue > 0) revCagr = (Math.pow(y0.revenue / y3.revenue, 1.0 / 3.0) - 1.0) * 100.0;
-      if (y3.deduct > 0 && y0.deduct > 0) dedCagr = (Math.pow(y0.deduct / y3.deduct, 1.0 / 3.0) - 1.0) * 100.0;
+      if (y3.revenue > 0 && y0.revenue > 0) { revCagr = (Math.pow(y0.revenue / y3.revenue, 1.0 / 3.0) - 1.0) * 100.0; hasRevCagr = true; }
+      if (y3.deduct > 0 && y0.deduct > 0) { dedCagr = (Math.pow(y0.deduct / y3.deduct, 1.0 / 3.0) - 1.0) * 100.0; hasDedCagr = true; }
     }
 
     var growth = [];
@@ -795,24 +833,36 @@
     if (latest.dep > 0) capexDep = latest.capex / latest.dep;
 
     var s3 = 0;
-    if (revCagr >= 15) s3 += 30;
-    else if (revCagr >= 8) s3 += 22;
-    else if (revCagr >= 0) s3 += 12;
+    if (hasRevCagr) {
+      if (revCagr >= 15) s3 += 30;
+      else if (revCagr >= 8) s3 += 22;
+      else if (revCagr >= 0) s3 += 12;
+    }
 
-    if (dedCagr >= 15) s3 += 30;
-    else if (dedCagr >= 8) s3 += 22;
-    else if (dedCagr >= 0) s3 += 12;
+    if (hasDedCagr) {
+      if (dedCagr >= 15) s3 += 30;
+      else if (dedCagr >= 8) s3 += 22;
+      else if (dedCagr >= 0) s3 += 12;
+    }
 
-    if (growthSd <= 10) s3 += 20;
-    else if (growthSd <= 25) s3 += 12;
-    else s3 += 4;
+    if (growth.length >= 2) {
+      if (growthSd <= 10) s3 += 20;
+      else if (growthSd <= 25) s3 += 12;
+      else s3 += 4;
+    }
 
-    if (peg > 0) {
-      if (peg <= 1) s3 += 20;
-      else if (peg <= 1.5) s3 += 14;
-      else if (peg <= 2) s3 += 8;
-      else s3 += 2;
-    } else s3 += 8;
+    if (hasDedCagr) {
+      if (dedCagr > 0 && peTtm > 0) {
+        if (peg <= 1) s3 += 20;
+        else if (peg <= 1.5) s3 += 14;
+        else if (peg <= 2) s3 += 8;
+        else s3 += 2;
+      } else if (dedCagr > 0) {
+        s3 += 8;
+      } else {
+        s3 += 2;
+      }
+    }
 
     if (s3 > 100) s3 = 100;
     if (s3 < 0) s3 = 0;
@@ -936,7 +986,7 @@
     if (roeAvg < MIN_ROE) notes.push('ROE5年均值' + R1(roeAvg).toFixed(1) + '%<' + MIN_ROE + '%');
     if (pePct5 >= MAX_PE_PCT) notes.push('PE分位' + R1(pePct5).toFixed(0) + '%偏高');
     if (pbPct5 >= MAX_PE_PCT) notes.push('PB分位' + R1(pbPct5).toFixed(0) + '%偏高');
-    if (dedCagr < 0) notes.push('扣非3年CAGR' + R1(dedCagr).toFixed(1) + '%');
+    if (hasDedCagr && dedCagr < 0) notes.push('扣非3年CAGR' + R1(dedCagr).toFixed(1) + '%');
     if (mom.label === '降档' || mom.label === '失速') notes.push('利润增速' + mom.label);
     if (notes.length === 0) notes.push('各项均在阈值内，仍需人工复核行业景气');
     var conclusion = notes.join('；');
@@ -1130,7 +1180,7 @@
         roeSd: R2(roeSd), gmDelta: R2(gmDelta), lev: R2(lev), roic: R2(latest.roic), series: l2Series
       },
       l3: {
-        score: R1(s3), verdict: l3Verdict, revCagr: R2(revCagr), dedCagr: R2(dedCagr),
+        score: R1(s3), verdict: l3Verdict, revCagr: hasRevCagr ? R2(revCagr) : null, dedCagr: hasDedCagr ? R2(dedCagr) : null,
         growthSd: R2(growthSd), peg: R2(peg), capexDep: R2(capexDep),
         annual: annualSeries, partial: partial, quarters: quarters, momentum: mom,
         rd: {
