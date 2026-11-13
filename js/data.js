@@ -133,6 +133,43 @@
     return Math.round(v2) / f;
   }
 
+  /* 腾讯日 K 兜底（东财不可用时使用，与电脑版 Get-KlineTencent 同源） */
+  async function klineTencent(code, klt, limit) {
+    var sym = tencentSymbol(code);
+    var kname = klt === '102' ? 'week' : klt === '103' ? 'month' : 'day';
+    var now = new Date();
+    var start = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 365 * 4);
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var ymd = function (dt) { return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()); };
+    var urls = [
+      'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=' + sym + ',' + kname + ',' + ymd(start) + ',' + ymd(now) + ',' + limit + ',qfq',
+      'https://proxy.finance.qq.com/ifzqgtimg/appstock/app/newfqkline/get?param=' + sym + ',' + kname + ',,,' + limit + ',qfq'
+    ];
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var r = await fetch(urls[i], { cache: 'no-store' });
+        var j = await r.json();
+        var node = j && j.data && j.data[sym];
+        if (!node) continue;
+        var arr = node[kname] || node['qfq' + kname];
+        if (!arr || !arr.length) continue;
+        var bars = [];
+        for (var k = 0; k < arr.length; k++) {
+          var p = arr[k];
+          if (!p || p.length < 6) continue;
+          bars.push({ d: String(p[0]).slice(0, 10), o: rnd(p[1], 2), c: rnd(p[2], 2), h: rnd(p[3], 2), l: rnd(p[4], 2), v: rnd(p[5], 2), amt: 0, pct: 0, turn: 0 });
+        }
+        if (!bars.length) continue;
+        for (var m = 1; m < bars.length; m++) {
+          var pc = bars[m - 1].c;
+          if (pc > 0) bars[m].pct = rnd((bars[m].c - pc) / pc * 100.0, 2);
+        }
+        return { ok: true, code: code, name: '', period: kname, klt: klt, source: 'tencent', count: bars.length, asOf: bars[bars.length - 1].d, bars: bars };
+      } catch (e) { /* 换下一个地址 */ }
+    }
+    return null;
+  }
+
   D.kline = async function (code, period, limit) {
     period = String(period || 'day').toLowerCase();
     var klt = '101', pname = 'day';
@@ -147,6 +184,8 @@
       var j = await r.json();
       var data = j && j.data;
       if (!data || !data.klines || data.klines.length < 5) {
+        var fb = await klineTencent(code, klt, limit);
+        if (fb) return fb;
         return { ok: false, code: code, period: pname, error: 'K 线数据获取失败（代码可能不存在、停牌或行情接口暂时不可用）' };
       }
       var bars = data.klines.map(function (s) {
@@ -170,6 +209,8 @@
         volMa5: vma5.map(function (x) { return x === null ? null : rnd(x, 2); })
       };
     } catch (e) {
+      var fb2 = await klineTencent(code, klt, limit);
+      if (fb2) return fb2;
       return { ok: false, code: code, period: pname, error: 'K 线数据获取失败：' + e.message };
     }
   };
