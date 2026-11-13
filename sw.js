@@ -1,6 +1,6 @@
 /* Service Worker：只缓存"壳"（页面/样式/脚本/图标），
    /api/* 全部走本地计算，不经过缓存；数据本身永远实时联网取。 */
-const CACHE = 'wb-wugc-v1';
+const CACHE = 'wb-wugc-v2';
 const SHELL = [
   './index.html',
   './style.css',
@@ -32,7 +32,8 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   // 接口与第三方数据：一律走网络，不缓存
-  if (url.pathname.startsWith('/api/') || url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
 
   e.respondWith(
     caches.match(req).then((hit) => {
