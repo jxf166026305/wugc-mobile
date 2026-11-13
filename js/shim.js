@@ -96,8 +96,16 @@
       if (!/^\d{6}$/.test(code)) return { ok: false, error: '请输入 6 位 A 股代码' };
       return await root.NewsLayer.forStock(code);
     },
-    '/api/indices': async function () { return notYet('全球指数'); },
-    '/api/uspremarket': async function () { return notYet('美股盘前'); },
+    '/api/indices': async function (u) {
+      if (!root.IndexLayer) return { ok: false, error: '指数模块未加载' };
+      return await root.IndexLayer.list(u.searchParams.get('refresh') === '1');
+    },
+    '/api/uspremarket': async function (u) {
+      if (!root.PremarketLayer) return { ok: false, error: '盘前模块未加载' };
+      var preset = u.searchParams.get('preset') || '';
+      var codes = String(u.searchParams.get('codes') || '').split(/[,，\s]+/).filter(function (x) { return x; });
+      return await root.PremarketLayer.list(preset, codes, u.searchParams.get('refresh') === '1');
+    },
     '/api/limitup': async function () { return notYet('放量涨停研究'); },
     '/api/limitup/detail': async function () { return notYet('涨停个股详情'); },
     '/api/deep': async function (u) {
