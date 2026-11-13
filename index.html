@@ -313,7 +313,7 @@
       </div>
       <div class="idx-summary" id="indicesSummary"></div>
       <div id="indicesGroups"></div>
-      <p class="scan-note muted">数据来源：腾讯（A 股）、新浪（港股 / 日经 / KOSPI / 欧洲 / 美股等）、CNBC（马来西亚等）、SET 官网（泰国）。每张卡片标注真实行情时间与状态，休市或未开盘不会伪造涨跌。</p>
+      <p class="scan-note muted">数据来源：东方财富 push2 快照（统一口径）。每张卡片标注真实行情时间与状态，休市或未开盘不会伪造涨跌。</p>
     </section>
 
     <!-- 美股盘前 -->
@@ -321,7 +321,7 @@
       <div class="card pm-head">
         <div class="pm-head-main">
           <h2>美股盘前 <span class="tag" id="pmSessionTag">—</span></h2>
-          <p class="muted">三大期指 + 热门美股 / 纳斯达克100 成分股盘前、盘后延时段行情。时间统一标注美东 ET，红涨绿跌，与 A 股习惯一致。</p>
+          <p class="muted">三大期指 + 热门美股 / 纳斯达克100 成分股行情（个股为常规时段，延时段数据浏览器跨域受限未接）。时间统一标注美东 ET，红涨绿跌，与 A 股习惯一致。</p>
         </div>
         <div class="pm-head-act">
           <span class="muted" id="premarketStatus">—</span>
@@ -365,7 +365,8 @@
 <script src="js/news.js?v=7"></script>
 <script src="js/indices.js?v=5"></script>
 <script src="js/premarket.js?v=5"></script>
-<script src="js/shim.js?v=9"></script>
+<script src="js/limitup.js?v=1"></script>
+<script src="js/shim.js?v=10"></script>
 <script src="app.js?v=2"></script>
 <script src="js/pwa.js?v=5"></script>
 </body>
