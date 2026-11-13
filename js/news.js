@@ -60,7 +60,13 @@
     try {
       var ctrl = new AbortController();
       var t = setTimeout(function () { ctrl.abort(); }, ms || 15000);
-      var r = await fetch(url, { signal: ctrl.signal, headers: { Accept: 'application/json, text/plain, */*' } });
+      var r = await fetch(url, {
+        signal: ctrl.signal,
+        // 东财资讯接口对带外部 Referer 的请求直接拒绝(567)，必须显式不发 Referer
+        referrerPolicy: 'no-referrer',
+        credentials: 'omit',
+        headers: { Accept: 'application/json, text/plain, */*' }
+      });
       clearTimeout(t);
       if (!r.ok) return null;
       return await r.text();
